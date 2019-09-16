@@ -1,0 +1,1 @@
+# laravel-exception-mailler

@@ -12,6 +12,14 @@ use Symfony\Component\Debug\ExceptionHandler as SymfonyExceptionHandler;
 use Symfony\Component\Debug\Exception\FatalThrowableError;
 use Symfony\Component\Debug\Exception\FatalErrorException;
 use Symfony\Component\Console\Exception\CommandNotFoundException;
+
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Validation\ValidationException;
+
 use App\Exceptions\DummyException;
 
 use App\Mail\ExceptionOccured;
@@ -26,7 +34,11 @@ class Handler extends ExceptionHandler
      * @var array
      */
     protected $dontReport = [
-        ///
+        \Illuminate\Auth\AuthenticationException::class,
+        \Illuminate\Auth\Access\AuthorizationException::class,
+        \Symfony\Component\HttpKernel\Exception\HttpException::class,
+        \Illuminate\Session\TokenMismatchException::class,
+        \Illuminate\Validation\ValidationException::class,
     ];
 
     protected $shouldCapture = [
@@ -34,7 +46,6 @@ class Handler extends ExceptionHandler
         FatalErrorException::class,
         CommandNotFoundException::class,
         DummyException::class,
-        Exception::class,
         ErrorException::class,
     ];
 
@@ -60,7 +71,7 @@ class Handler extends ExceptionHandler
     {
         if ($this->shouldReport($exception)) {
             $this->sendEmail($exception); // sends an email
-        }       
+        }
         parent::report($exception);
     }
 
@@ -79,15 +90,15 @@ class Handler extends ExceptionHandler
         return parent::render($request, $exception);
     }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////
 
     private function is404($exception)
     {
         return $exception instanceof \Illuminate\Database\Eloquent\ModelNotFoundException
-                || $exception instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;                                        
+            || $exception instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
     }
 
-    private function log404($request) 
+    private function log404($request)
     {
         $error = [
             'url'    => $request->url(),
@@ -100,11 +111,11 @@ class Handler extends ExceptionHandler
         Log::debug($message);
     }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////
 
     public function shouldReport(Exception $exception)
     {
-        
+
         if (!is_array($this->shouldCapture)) {
             return false;
         }
@@ -114,7 +125,7 @@ class Handler extends ExceptionHandler
         foreach ($this->shouldCapture as $type) {
             if ($exception instanceof $type) {
                 return true;
-            }                                  
+            }
         }
         return false;
     }
@@ -131,14 +142,16 @@ class Handler extends ExceptionHandler
 
             Mail::to('bahri@genel.com')->send(new ExceptionOccured($error_type, $html));
             Log::info('hata bilgisi gönderildi');
-
         } catch (Exception $ex) {
             dd($ex);
         }
-
     }
 
-/////////////////////////////////////////////////////////////////////////////////////////    
+    /////////////////////////////////////////////////////////////////////////////////////////    
 
-
+    public function unauthenticated($request, AuthenticationException $exception)
+    {
+        // return ''; // use redirect('/login') or something if you want to redirect to login.
+        return redirect('/login');
+    }
 }

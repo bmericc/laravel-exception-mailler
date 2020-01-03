@@ -17,15 +17,17 @@ class ExceptionOccured extends Mailable
      */
     public $content;
     public $subject;
+    public $request;
     /**
      * Create a new message instance.
      *
      * @return void
      */
-    public function __construct($subject, $content)
+    public function __construct($subject, $content, $request)
     {
         $this->content = $content;
         $this->subject = $subject;
+        $this->request = $request;
     }
     /**
      * Build the message.
@@ -36,6 +38,6 @@ class ExceptionOccured extends Mailable
     {
         return $this->view('emails.exception')
             ->subject(env('APP_NAME', "Site")." - " . $this->subject)
-            ->with(['subject' => $this->subject, 'content' => $this->content]);
+            ->with(['subject' => $this->subject, 'content' => $this->content, 'request' => $this->request]);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Exceptions;
 
-
 use \Exception;
 use \ErrorException;
 use \RuntimeException;
@@ -32,6 +31,7 @@ class Handler extends ExceptionHandler
         \Illuminate\Auth\AuthenticationException::class,
         \Illuminate\Auth\Access\AuthorizationException::class,
         \Symfony\Component\HttpKernel\Exception\HttpException::class,
+        \Illuminate\Database\Eloquent\ModelNotFoundException::class,
         \Illuminate\Session\TokenMismatchException::class,
         \Illuminate\Validation\ValidationException::class,
     ];
@@ -68,7 +68,8 @@ class Handler extends ExceptionHandler
         if ($this->shouldReport($exception)) {
             $request = (object)[
                 'url' => Request::url(),
-                'inputs' => Request::all()
+                'inputs' => Request::all(),
+                'ip' => $this->getClientIp()
             ];
             $this->sendEmail($exception, $request); // sends an email
         }       
@@ -90,15 +91,21 @@ class Handler extends ExceptionHandler
         return parent::render($request, $exception);
     }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////
+
+    private function isAuth($exception)
+    {
+        return $exception instanceof \Illuminate\Auth\AuthenticationException
+            || $exception instanceof \Illuminate\Auth\Access\AuthorizationException;
+    }
 
     private function is404($exception)
     {
         return $exception instanceof \Illuminate\Database\Eloquent\ModelNotFoundException
-                || $exception instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;                                        
+            || $exception instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
     }
 
-    private function log404($request) 
+    private function log404($request)
     {
         $error = [
             'url'    => $request->url(),
@@ -111,13 +118,13 @@ class Handler extends ExceptionHandler
         Log::debug($message);
     }
 
-/////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////
 
     public function shouldReport(Exception $exception)
     {
+        if ($this->is404($exception)) return false;
+        if ($this->isAuth($exception)) return false;
 
-        if($this->is404($exception)) return false;
-        
         if (!is_array($this->shouldCapture)) {
             return false;
         }
@@ -127,7 +134,7 @@ class Handler extends ExceptionHandler
         foreach ($this->shouldCapture as $type) {
             if ($exception instanceof $type) {
                 return true;
-            }                                  
+            }
         }
         return false;
     }
@@ -142,7 +149,7 @@ class Handler extends ExceptionHandler
             $html = $handler->getHtml($e);
             $error_type = get_class($e);
 
-            Mail::to('bahri@genel.com')->send(new ExceptionOccured($error_type, $html, $request));
+            Mail::to('bahri@tarti.com')->send(new ExceptionOccured($error_type, $html, $request));
             Log::info('hata bilgisi gönderildi');
 
         } catch (Exception $ex) {
@@ -151,15 +158,33 @@ class Handler extends ExceptionHandler
 
     }
 
+    public function getClientIp() {
+        
+        $ipaddress = '';
+        if (getenv('HTTP_CLIENT_IP'))
+            $ipaddress = getenv('HTTP_CLIENT_IP');
+        else if(getenv('HTTP_X_FORWARDED_FOR'))
+            $ipaddress = getenv('HTTP_X_FORWARDED_FOR');
+        else if(getenv('HTTP_X_FORWARDED'))
+            $ipaddress = getenv('HTTP_X_FORWARDED');
+        else if(getenv('HTTP_FORWARDED_FOR'))
+            $ipaddress = getenv('HTTP_FORWARDED_FOR');
+        else if(getenv('HTTP_FORWARDED'))
+            $ipaddress = getenv('HTTP_FORWARDED');
+        else if(getenv('REMOTE_ADDR'))
+            $ipaddress = getenv('REMOTE_ADDR');
+        else
+            $ipaddress = 'UNKNOWN';
+
+        return $ipaddress; 
+    }
+
     /////////////////////////////////////////////////////////////////////////////////////////    
 
-    /*
-    public function unauthenticated($request, AuthenticationException $exception)
+    public function unauthenticated($request=false, $exception=false)
     {
         // return ''; // use redirect('/login') or something if you want to redirect to login.
         return redirect('/login');
     }
-    */
-
-
+  
 }
